@@ -4,8 +4,8 @@ CanFrame createRpmFrame(std::uint16_t rpm)
 {
     CanFrame frame{};
 
-    frame.id = 0x100;
-    frame.length = 2;
+    frame.id = RPM_FRAME_ID;
+    frame.length = RPM_FRAME_LENGTH;
     frame.data[0] = static_cast<std::uint8_t>(rpm & 0xFF);
     frame.data[1] = static_cast<std::uint8_t>((rpm >> 8) & 0xFF);
 
@@ -20,5 +20,5 @@ std::uint16_t readRpm(const CanFrame& frame)
 
 bool isRpmFrame(const CanFrame& frame)
 {
-    return frame.id == 0x100 && frame.length == 2;
+    return frame.id == RPM_FRAME_ID && frame.length == RPM_FRAME_LENGTH;
 }

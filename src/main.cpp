@@ -7,7 +7,32 @@
 #include "dashboard_node.hpp"
 #include "engine_node.hpp"
 #include "temperature_message.hpp"
+void processMessages(CanBus& bus, DashboardNode& dashboard)
+{
+    CanFrame frame{};
 
+    while (bus.receive(frame))
+    {
+        dashboard.receiveFrame(frame);
+    }
+}
+void sendEngineMessages(const EngineNode& engine, CanBus& bus)
+{
+    bus.send(engine.createFrame());
+    bus.send(engine.createTemperatureFrame());
+}
+void runEngineUpdate(EngineNode& engine, CanBus& bus, DashboardNode& dashboard)
+{
+    std::cout << "Sending both engine values...\n";
+
+    engine.setRpm(1800);
+    engine.setTemperature(85);
+
+    sendEngineMessages(engine, bus);
+    processMessages(bus, dashboard);
+
+    dashboard.printStatus(std::chrono::seconds(2));
+}
 int main()
 {
     EngineNode engine{0};
@@ -30,12 +55,7 @@ int main()
 
         bus.send(engine.createFrame());
 
-        CanFrame receivedFrame{};
-
-        if (bus.receive(receivedFrame))
-        {
-            dashboard.receiveFrame(receivedFrame);
-        }
+        processMessages(bus, dashboard);
         dashboard.printStatus(std::chrono::seconds(2));
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
@@ -61,12 +81,7 @@ int main()
 
     bus.send(engine.createFrame());
 
-    CanFrame recoveryFrame{};
-
-    if (bus.receive(recoveryFrame))
-    {
-        dashboard.receiveFrame(recoveryFrame);
-    }
+    processMessages(bus, dashboard);
 
     dashboard.printStatus(std::chrono::seconds(2));
     CanFrame shortFrame = engine.createFrame();
@@ -123,15 +138,12 @@ int main()
     dashboard.printStatus(std::chrono::seconds(2));
     std::cout << "Sending only temperature...\n";
 
-    bus.send(createTemperatureFrame(90));
+    engine.setTemperature(90);
+    bus.send(engine.createTemperatureFrame());
 
-    CanFrame freshTemperatureFrame{};
-
-    if (bus.receive(freshTemperatureFrame))
-    {
-        dashboard.receiveFrame(freshTemperatureFrame);
-    }
+    processMessages(bus, dashboard);
 
     dashboard.printStatus(std::chrono::seconds(2));
+    runEngineUpdate(engine, bus, dashboard);
     return 0;
 }

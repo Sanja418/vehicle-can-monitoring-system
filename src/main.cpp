@@ -6,6 +6,7 @@
 #include "can_bus.hpp"
 #include "dashboard_node.hpp"
 #include "engine_node.hpp"
+#include "temperature_message.hpp"
 
 int main()
 {
@@ -92,5 +93,45 @@ int main()
         dashboard.receiveFrame(queuedFrame);
         dashboard.printStatus(std::chrono::seconds(2));
     }
+    CanFrame temperatureFrame = createTemperatureFrame(-10);
+
+    if (isTemperatureFrame(temperatureFrame))
+    {
+        std::cout << "Temperature: " << readTemperature(temperatureFrame) << " C\n";
+    }
+    std::cout << "Has temperature before: " << dashboard.hasTemperature() << '\n';
+
+    bus.send(createTemperatureFrame(-10));
+
+    CanFrame receivedTemperatureFrame{};
+
+    if (bus.receive(receivedTemperatureFrame))
+    {
+        dashboard.receiveFrame(receivedTemperatureFrame);
+    }
+
+    std::cout << "Has temperature after: " << dashboard.hasTemperature() << '\n';
+
+    std::cout << "Dashboard temperature: " << dashboard.getTemperature() << " C\n";
+
+    std::cout << "RPM after temperature: " << dashboard.getRpm() << '\n';
+    dashboard.printStatus(std::chrono::seconds(2));
+    std::cout << "Waiting without new messages...\n";
+
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    dashboard.printStatus(std::chrono::seconds(2));
+    std::cout << "Sending only temperature...\n";
+
+    bus.send(createTemperatureFrame(90));
+
+    CanFrame freshTemperatureFrame{};
+
+    if (bus.receive(freshTemperatureFrame))
+    {
+        dashboard.receiveFrame(freshTemperatureFrame);
+    }
+
+    dashboard.printStatus(std::chrono::seconds(2));
     return 0;
 }

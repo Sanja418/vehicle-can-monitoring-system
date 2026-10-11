@@ -11,6 +11,7 @@ add_executable(vehicle_can_monitoring
     src/engine_node.cpp
     src/dashboard_node.cpp
     src/can_bus.cpp
+    src/temperature_message.cpp
 )
 
 target_include_directories(vehicle_can_monitoring PRIVATE include)

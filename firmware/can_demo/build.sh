@@ -25,6 +25,8 @@ build_firmware()
         firmware/can_demo/main.cpp \
                 -I include \
         src/rpm_message.cpp \
+                src/temperature_message.cpp \
+                        src/speed_message.cpp \
         "$@"
 }
 

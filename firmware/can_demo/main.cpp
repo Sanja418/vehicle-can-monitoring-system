@@ -1,4 +1,6 @@
 #include "rpm_message.hpp"
+#include "speed_message.hpp"
+#include "temperature_message.hpp"
 volatile unsigned int counter = 0;
 
 volatile unsigned int& registerAt(unsigned int address)
@@ -88,9 +90,27 @@ bool initCan()
 
     return waitCanInit(false);
 }
-bool sendRpm(unsigned short rpm)
+bool sendCanFrame(const CanFrame& frame)
 {
-    CanFrame frame = createRpmFrame(rpm);
+    if (frame.id > 0x7FFu || frame.length > 8)
+    {
+        return false;
+    }
+
+    unsigned int lowData = 0;
+    unsigned int highData = 0;
+
+    for (unsigned int i = 0; i < frame.length; ++i)
+    {
+        if (i < 4)
+        {
+            lowData |= static_cast<unsigned int>(frame.data[i]) << (8 * i);
+        }
+        else
+        {
+            highData |= static_cast<unsigned int>(frame.data[i]) << (8 * (i - 4));
+        }
+    }
 
     for (unsigned int attempt = 0; attempt < 100000; ++attempt)
     {
@@ -98,13 +118,10 @@ bool sendRpm(unsigned short rpm)
         {
             unsigned int identifier = frame.id << 21;
 
-            unsigned int data = static_cast<unsigned int>(frame.data[0]) |
-                                (static_cast<unsigned int>(frame.data[1]) << 8);
-
             registerAt(0x40006580) = identifier;
             registerAt(0x40006584) = frame.length;
-            registerAt(0x40006588) = data;
-            registerAt(0x4000658C) = 0u;
+            registerAt(0x40006588) = lowData;
+            registerAt(0x4000658C) = highData;
 
             registerAt(0x40006580) = identifier | 1u;
 
@@ -114,7 +131,12 @@ bool sendRpm(unsigned short rpm)
 
     return false;
 }
-bool receiveRpm(unsigned short& rpm)
+
+bool sendRpm(unsigned short rpm)
+{
+    return sendCanFrame(createRpmFrame(rpm));
+}
+bool receiveCanFrame(CanFrame& frame)
 {
     if ((registerAt(0x4000640C) & 3u) == 0)
     {
@@ -123,23 +145,40 @@ bool receiveRpm(unsigned short& rpm)
 
     unsigned int identifier = registerAt(0x400065B0);
     unsigned int length = registerAt(0x400065B4) & 0xFu;
-    unsigned int data = registerAt(0x400065B8);
+    unsigned int lowData = registerAt(0x400065B8);
+    unsigned int highData = registerAt(0x400065BC);
 
     registerAt(0x4000640C) = 1u << 5;
 
-    // Reject extended frames and remote requests.
-    if ((identifier & 6u) != 0)
+    if ((identifier & 6u) != 0 || length > 8)
     {
         return false;
     }
 
-    CanFrame frame{};
+    frame = CanFrame{};
     frame.id = (identifier >> 21) & 0x7FFu;
     frame.length = static_cast<std::uint8_t>(length);
-    frame.data[0] = static_cast<std::uint8_t>(data & 0xFFu);
-    frame.data[1] = static_cast<std::uint8_t>((data >> 8) & 0xFFu);
 
-    if (!isRpmFrame(frame))
+    for (unsigned int i = 0; i < length; ++i)
+    {
+        if (i < 4)
+        {
+            frame.data[i] = static_cast<std::uint8_t>((lowData >> (8 * i)) & 0xFFu);
+        }
+        else
+        {
+            frame.data[i] = static_cast<std::uint8_t>((highData >> (8 * (i - 4))) & 0xFFu);
+        }
+    }
+
+    return true;
+}
+
+bool receiveRpm(unsigned short& rpm)
+{
+    CanFrame frame{};
+
+    if (!receiveCanFrame(frame) || !isRpmFrame(frame))
     {
         return false;
     }
@@ -180,13 +219,43 @@ int main()
 
     while (true)
     {
-        unsigned short rpm = 0;
+        CanFrame frame{};
 
-        if (receiveRpm(rpm))
+        if (receiveCanFrame(frame))
         {
-            writeUart("Received RPM: ");
-            writeNumber(rpm);
-            writeUart("\r\n");
+            if (isRpmFrame(frame))
+            {
+                writeUart("Received RPM: ");
+                writeNumber(readRpm(frame));
+                writeUart("\r\n");
+            }
+            else if (isTemperatureFrame(frame))
+            {
+                std::int16_t temperature = readTemperature(frame);
+
+                writeUart("Received temperature: ");
+
+                if (temperature < 0)
+                {
+                    writeUart("-");
+                }
+
+                int magnitude = temperature;
+
+                if (magnitude < 0)
+                {
+                    magnitude = -magnitude;
+                }
+
+                writeNumber(static_cast<unsigned short>(magnitude));
+                writeUart(" C\r\n");
+            }
+            else if (isSpeedFrame(frame))
+            {
+                writeUart("Received speed: ");
+                writeNumber(readSpeed(frame));
+                writeUart(" km/h\r\n");
+            }
         }
     }
 #else
@@ -200,7 +269,22 @@ int main()
     {
         writeUart("CAN transmit mailbox unavailable!\r\n");
     }
-
+    if (sendCanFrame(createTemperatureFrame(-10)))
+    {
+        writeUart("Temperature transmission requested!\r\n");
+    }
+    else
+    {
+        writeUart("Temperature transmission request failed!\r\n");
+    }
+    if (sendCanFrame(createSpeedFrame(60)))
+    {
+        writeUart("Speed transmission requested!\r\n");
+    }
+    else
+    {
+        writeUart("Speed transmission request failed!\r\n");
+    }
     while (true)
     {
         counter = counter + 1;

@@ -2,6 +2,7 @@ Clear
 mach create "Hello"
 
 machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+showAnalyzer sysbus.uart4
 
 sysbus LoadELF $ORIGIN/../../build/firmware/hello/hello.elf
 

@@ -12,6 +12,8 @@ add_executable(vehicle_can_monitoring
     src/dashboard_node.cpp
     src/can_bus.cpp
     src/temperature_message.cpp
+    src/speed_message.cpp
+        src/vehicle_node.cpp
 )
 
 target_include_directories(vehicle_can_monitoring PRIVATE include)
@@ -47,6 +49,7 @@ add_executable(dashboard_node_test
     src/dashboard_node.cpp
     src/rpm_message.cpp
     src/temperature_message.cpp
+    src/speed_message.cpp
 )
 
 target_include_directories(dashboard_node_test PRIVATE include)
@@ -57,8 +60,26 @@ add_executable(engine_node_test
     src/engine_node.cpp
     src/rpm_message.cpp
     src/temperature_message.cpp
+        src/speed_message.cpp
 )
 
 target_include_directories(engine_node_test PRIVATE include)
 
 add_test(NAME engine_node_test COMMAND engine_node_test)
+add_executable(speed_message_test
+    tests/speed_message_test.cpp
+    src/speed_message.cpp
+)
+
+target_include_directories(speed_message_test PRIVATE include)
+
+add_test(NAME speed_message_test COMMAND speed_message_test)
+add_executable(vehicle_node_test
+    tests/vehicle_node_test.cpp
+    src/vehicle_node.cpp
+    src/speed_message.cpp
+)
+
+target_include_directories(vehicle_node_test PRIVATE include)
+
+add_test(NAME vehicle_node_test COMMAND vehicle_node_test)

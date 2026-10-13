@@ -6,7 +6,9 @@
 #include "can_bus.hpp"
 #include "dashboard_node.hpp"
 #include "engine_node.hpp"
+#include "speed_message.hpp"
 #include "temperature_message.hpp"
+#include "vehicle_node.hpp"
 void processMessages(CanBus& bus, DashboardNode& dashboard)
 {
     CanFrame frame{};
@@ -145,5 +147,19 @@ int main()
 
     dashboard.printStatus(std::chrono::seconds(2));
     runEngineUpdate(engine, bus, dashboard);
+    std::cout << "Simulating engine overheating...\n";
+
+    engine.setTemperature(115);
+    bus.send(engine.createTemperatureFrame());
+
+    processMessages(bus, dashboard);
+    dashboard.printStatus(std::chrono::seconds(2));
+    std::cout << "Sending vehicle speed...\n";
+
+    VehicleNode vehicle{60};
+    bus.send(vehicle.createFrame());
+    processMessages(bus, dashboard);
+
+    dashboard.printStatus(std::chrono::seconds(2));
     return 0;
 }

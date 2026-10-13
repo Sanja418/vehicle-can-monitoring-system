@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "rpm_message.hpp"
+#include "speed_message.hpp"
 #include "temperature_message.hpp"
 
 int main()
@@ -102,6 +103,107 @@ int main()
     if (!timedDashboard.isRpmFresh(timeout, later))
     {
         std::cerr << "RPM did not recover after a new message\n";
+        return 1;
+    }
+    DashboardNode warningDashboard;
+
+    auto warningTime = std::chrono::steady_clock::time_point{};
+    auto warningTimeout = std::chrono::seconds(2);
+
+    if (warningDashboard.isEngineOverheated(warningTimeout, warningTime))
+    {
+        std::cerr << "Missing temperature triggered a warning\n";
+        return 1;
+    }
+
+    warningDashboard.receiveFrame(createTemperatureFrame(109), warningTime);
+
+    if (warningDashboard.isEngineOverheated(warningTimeout, warningTime))
+    {
+        std::cerr << "Temperature below threshold triggered a warning\n";
+        return 1;
+    }
+
+    warningDashboard.receiveFrame(createTemperatureFrame(110), warningTime);
+
+    if (!warningDashboard.isEngineOverheated(warningTimeout, warningTime))
+    {
+        std::cerr << "Temperature at threshold did not trigger a warning\n";
+        return 1;
+    }
+
+    warningDashboard.receiveFrame(createTemperatureFrame(120), warningTime);
+
+    if (!warningDashboard.isEngineOverheated(warningTimeout, warningTime))
+    {
+        std::cerr << "Temperature above threshold did not trigger a warning\n";
+        return 1;
+    }
+
+    auto staleWarningTime = warningTime + warningTimeout;
+
+    if (warningDashboard.isEngineOverheated(warningTimeout, staleWarningTime))
+    {
+        std::cerr << "Stale temperature triggered a current warning\n";
+        return 1;
+    }
+    DashboardNode speedDashboard;
+
+    auto speedStart = std::chrono::steady_clock::time_point{};
+    auto speedTimeout = std::chrono::seconds(2);
+
+    if (speedDashboard.hasSpeed() || speedDashboard.isSpeedFresh(speedTimeout, speedStart))
+    {
+        std::cerr << "New dashboard should have no speed data\n";
+        return 1;
+    }
+
+    speedDashboard.receiveFrame(createSpeedFrame(0), speedStart);
+
+    if (!speedDashboard.hasSpeed() || speedDashboard.getSpeed() != 0)
+    {
+        std::cerr << "Zero speed was not stored correctly\n";
+        return 1;
+    }
+
+    speedDashboard.receiveFrame(createSpeedFrame(60), speedStart);
+
+    auto speedBeforeDeadline = speedStart + std::chrono::milliseconds(1999);
+    auto speedDeadline = speedStart + speedTimeout;
+
+    if (!speedDashboard.isSpeedFresh(speedTimeout, speedBeforeDeadline) ||
+        speedDashboard.isSpeedFresh(speedTimeout, speedDeadline))
+    {
+        std::cerr << "Speed freshness deadline is incorrect\n";
+        return 1;
+    }
+
+    CanFrame invalidSpeed = createSpeedFrame(999);
+    invalidSpeed.length = 1;
+    speedDashboard.receiveFrame(invalidSpeed, speedDeadline);
+
+    if (speedDashboard.getSpeed() != 60 || speedDashboard.isSpeedFresh(speedTimeout, speedDeadline))
+    {
+        std::cerr << "Invalid frame changed or refreshed speed\n";
+        return 1;
+    }
+
+    speedDashboard.receiveFrame(createRpmFrame(2000), speedDeadline);
+    speedDashboard.receiveFrame(createTemperatureFrame(90), speedDeadline);
+
+    if (speedDashboard.isSpeedFresh(speedTimeout, speedDeadline))
+    {
+        std::cerr << "Other messages refreshed speed\n";
+        return 1;
+    }
+
+    speedDashboard.receiveFrame(createSpeedFrame(80), speedDeadline);
+
+    if (speedDashboard.getSpeed() != 80 ||
+        !speedDashboard.isSpeedFresh(speedTimeout, speedDeadline) ||
+        speedDashboard.getRpm() != 2000 || speedDashboard.getTemperature() != 90)
+    {
+        std::cerr << "Speed recovery or independent data is incorrect\n";
         return 1;
     }
     std::cout << "Dashboard state tests passed\n";

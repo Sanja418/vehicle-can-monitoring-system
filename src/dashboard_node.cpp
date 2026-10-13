@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "rpm_message.hpp"
+#include "speed_message.hpp"
 #include "temperature_message.hpp"
 
 void DashboardNode::receiveFrame(const CanFrame& frame, std::chrono::steady_clock::time_point now)
@@ -18,6 +19,12 @@ void DashboardNode::receiveFrame(const CanFrame& frame, std::chrono::steady_cloc
         temperature_ = readTemperature(frame);
         hasTemperature_ = true;
         lastTemperatureTime_ = now;
+    }
+    else if (isSpeedFrame(frame))
+    {
+        speed_ = readSpeed(frame);
+        hasSpeed_ = true;
+        lastSpeedTime_ = now;
     }
     else
     {
@@ -68,6 +75,22 @@ void DashboardNode::printStatus(std::chrono::milliseconds timeout) const
     else
     {
         std::cout << "Dashboard temperature: " << getTemperature() << " C\n";
+        if (isEngineOverheated(timeout))
+        {
+            std::cout << "WARNING: engine temperature too high\n";
+        }
+    }
+    if (!hasSpeed())
+    {
+        std::cout << "Dashboard: no speed data\n";
+    }
+    else if (!isSpeedFresh(timeout))
+    {
+        std::cout << "Dashboard: speed data stale\n";
+    }
+    else
+    {
+        std::cout << "Dashboard speed: " << getSpeed() << " km/h\n";
     }
 }
 std::int16_t DashboardNode::getTemperature() const
@@ -88,4 +111,29 @@ bool DashboardNode::isTemperatureFresh(std::chrono::milliseconds timeout,
     }
 
     return now - lastTemperatureTime_ < timeout;
+}
+bool DashboardNode::isEngineOverheated(std::chrono::milliseconds timeout,
+                                       std::chrono::steady_clock::time_point now) const
+{
+    return isTemperatureFresh(timeout, now) && temperature_ >= ENGINE_OVERHEAT_THRESHOLD_C;
+}
+std::uint16_t DashboardNode::getSpeed() const
+{
+    return speed_;
+}
+
+bool DashboardNode::hasSpeed() const
+{
+    return hasSpeed_;
+}
+
+bool DashboardNode::isSpeedFresh(std::chrono::milliseconds timeout,
+                                 std::chrono::steady_clock::time_point now) const
+{
+    if (!hasSpeed_)
+    {
+        return false;
+    }
+
+    return now - lastSpeedTime_ < timeout;
 }

@@ -2,7 +2,7 @@
 #include <chrono>
 
 #include "can_frame.hpp"
-
+inline constexpr std::int16_t ENGINE_OVERHEAT_THRESHOLD_C = 110;
 class DashboardNode
 {
    public:
@@ -20,6 +20,15 @@ class DashboardNode
     bool isTemperatureFresh(
         std::chrono::milliseconds timeout,
         std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) const;
+    bool isEngineOverheated(
+        std::chrono::milliseconds timeout,
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) const;
+    std::uint16_t getSpeed() const;
+    bool hasSpeed() const;
+
+    bool isSpeedFresh(
+        std::chrono::milliseconds timeout,
+        std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now()) const;
 
    private:
     std::uint16_t rpm_{0};
@@ -28,4 +37,7 @@ class DashboardNode
     std::int16_t temperature_{0};
     bool hasTemperature_{false};
     std::chrono::steady_clock::time_point lastTemperatureTime_{};
+    std::uint16_t speed_{0};
+    bool hasSpeed_{false};
+    std::chrono::steady_clock::time_point lastSpeedTime_{};
 };

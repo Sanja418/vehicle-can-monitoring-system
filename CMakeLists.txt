@@ -52,3 +52,13 @@ add_executable(dashboard_node_test
 target_include_directories(dashboard_node_test PRIVATE include)
 
 add_test(NAME dashboard_node_test COMMAND dashboard_node_test)
+add_executable(engine_node_test
+    tests/engine_node_test.cpp
+    src/engine_node.cpp
+    src/rpm_message.cpp
+    src/temperature_message.cpp
+)
+
+target_include_directories(engine_node_test PRIVATE include)
+
+add_test(NAME engine_node_test COMMAND engine_node_test)

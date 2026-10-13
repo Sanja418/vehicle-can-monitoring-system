@@ -77,6 +77,16 @@ int main()
     }
 
     auto later = start + std::chrono::seconds(3);
+    CanFrame invalidTimedFrame = createRpmFrame(9999);
+    invalidTimedFrame.length = 1;
+
+    timedDashboard.receiveFrame(invalidTimedFrame, later);
+
+    if (timedDashboard.isRpmFresh(timeout, later) || timedDashboard.getRpm() != 1500)
+    {
+        std::cerr << "Invalid frame refreshed or changed RPM\n";
+        return 1;
+    }
 
     timedDashboard.receiveFrame(createTemperatureFrame(85), later);
 

@@ -1,0 +1,14 @@
+Clear
+mach create "Hello"
+
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+
+sysbus LoadELF $ORIGIN/../../build/firmware/hello/hello.elf
+
+cpu VectorTableOffset 0x08000000
+cpu SP `sysbus ReadDoubleWord 0x08000000`
+cpu PC `sysbus ReadDoubleWord 0x08000004`
+
+sysbus ReadDoubleWord 0x20000000
+emulation RunFor "0.1s"
+sysbus ReadDoubleWord 0x20000000

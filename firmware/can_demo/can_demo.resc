@@ -1,0 +1,16 @@
+Clear
+mach create "CAN_Demo"
+
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+emulation CreateCANHub "canHub"
+connector Connect sysbus.can1 canHub
+logLevel 0 canHub
+showAnalyzer sysbus.uart4
+
+sysbus LoadELF $ORIGIN/../../build/firmware/can_demo/can_demo.elf
+
+cpu VectorTableOffset 0x08000000
+cpu SP `sysbus ReadDoubleWord 0x08000000`
+cpu PC `sysbus ReadDoubleWord 0x08000004`
+
+emulation RunFor "0.1s"

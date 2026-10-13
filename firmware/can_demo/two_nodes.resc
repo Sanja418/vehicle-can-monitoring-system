@@ -1,0 +1,27 @@
+Clear
+emulation CreateCANHub "canHub"
+logLevel 0 canHub
+
+mach create "Receiver"
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+connector Connect sysbus.can1 canHub
+showAnalyzer sysbus.uart4
+
+sysbus LoadELF $ORIGIN/../../build/firmware/can_demo/receiver.elf
+cpu VectorTableOffset 0x08000000
+cpu SP `sysbus ReadDoubleWord 0x08000000`
+cpu PC `sysbus ReadDoubleWord 0x08000004`
+
+emulation RunFor "0.01s"
+
+mach create "Sender"
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+connector Connect sysbus.can1 canHub
+showAnalyzer sysbus.uart4
+
+sysbus LoadELF $ORIGIN/../../build/firmware/can_demo/sender.elf
+cpu VectorTableOffset 0x08000000
+cpu SP `sysbus ReadDoubleWord 0x08000000`
+cpu PC `sysbus ReadDoubleWord 0x08000004`
+
+emulation RunFor "0.1s"

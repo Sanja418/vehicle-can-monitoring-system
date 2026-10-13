@@ -1,3 +1,4 @@
+#include "rpm_message.hpp"
 volatile unsigned int counter = 0;
 
 volatile unsigned int& registerAt(unsigned int address)
@@ -89,20 +90,23 @@ bool initCan()
 }
 bool sendRpm(unsigned short rpm)
 {
+    CanFrame frame = createRpmFrame(rpm);
+
     for (unsigned int attempt = 0; attempt < 100000; ++attempt)
     {
-        // Check whether transmit mailbox 0 is available.
         if ((registerAt(0x40006408) & (1u << 26)) != 0)
         {
-            registerAt(0x40006580) = 0x100u << 21;
-            registerAt(0x40006584) = 2u;
+            unsigned int identifier = frame.id << 21;
 
-            registerAt(0x40006588) = static_cast<unsigned int>(rpm);
+            unsigned int data = static_cast<unsigned int>(frame.data[0]) |
+                                (static_cast<unsigned int>(frame.data[1]) << 8);
 
+            registerAt(0x40006580) = identifier;
+            registerAt(0x40006584) = frame.length;
+            registerAt(0x40006588) = data;
             registerAt(0x4000658C) = 0u;
 
-            // Request transmission.
-            registerAt(0x40006580) = (0x100u << 21) | 1u;
+            registerAt(0x40006580) = identifier | 1u;
 
             return true;
         }
@@ -112,7 +116,6 @@ bool sendRpm(unsigned short rpm)
 }
 bool receiveRpm(unsigned short& rpm)
 {
-    // Check whether receive FIFO 0 contains a message.
     if ((registerAt(0x4000640C) & 3u) == 0)
     {
         return false;
@@ -122,18 +125,26 @@ bool receiveRpm(unsigned short& rpm)
     unsigned int length = registerAt(0x400065B4) & 0xFu;
     unsigned int data = registerAt(0x400065B8);
 
-    // Release the message from FIFO 0.
     registerAt(0x4000640C) = 1u << 5;
 
-    bool standardDataFrame = (identifier & 6u) == 0;
-    unsigned int id = (identifier >> 21) & 0x7FFu;
-
-    if (!standardDataFrame || id != 0x100u || length != 2u)
+    // Reject extended frames and remote requests.
+    if ((identifier & 6u) != 0)
     {
         return false;
     }
 
-    rpm = static_cast<unsigned short>(data & 0xFFFFu);
+    CanFrame frame{};
+    frame.id = (identifier >> 21) & 0x7FFu;
+    frame.length = static_cast<std::uint8_t>(length);
+    frame.data[0] = static_cast<std::uint8_t>(data & 0xFFu);
+    frame.data[1] = static_cast<std::uint8_t>((data >> 8) & 0xFFu);
+
+    if (!isRpmFrame(frame))
+    {
+        return false;
+    }
+
+    rpm = readRpm(frame);
     return true;
 }
 void writeNumber(unsigned short value)

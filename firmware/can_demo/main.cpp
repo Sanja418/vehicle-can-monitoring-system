@@ -355,8 +355,19 @@ int main()
         writeUart("Speed transmission request failed!\r\n");
     }
 
+    bool temperatureRecoverySent = false;
+
     while (true)
     {
+        if (!temperatureRecoverySent && readMilliseconds() >= 3000u)
+        {
+            if (sendCanFrame(createTemperatureFrame(90)))
+            {
+                writeUart("Temperature recovery requested!\r\n");
+                temperatureRecoverySent = true;
+            }
+        }
+
         counter = counter + 1;
     }
 #endif

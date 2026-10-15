@@ -331,45 +331,33 @@ int main()
     }
 
 #else
-    writeUart("CAN sender ready!\r\n");
+    writeUart("CAN periodic sender ready!\r\n");
 
-    if (sendRpm(1500))
-    {
-        writeUart("RPM transmission requested!\r\n");
-    }
-    else
-    {
-        writeUart("CAN transmit mailbox unavailable!\r\n");
-    }
-
-    if (sendCanFrame(createTemperatureFrame(-10)))
-    {
-        writeUart("Temperature transmission requested!\r\n");
-    }
-    else
-    {
-        writeUart("Temperature transmission request failed!\r\n");
-    }
-
-    if (sendCanFrame(createSpeedFrame(60)))
-    {
-        writeUart("Speed transmission requested!\r\n");
-    }
-    else
-    {
-        writeUart("Speed transmission request failed!\r\n");
-    }
-
-    bool temperatureRecoverySent = false;
+    bool firstTransmission = true;
+    unsigned int lastSendTime = 0;
 
     while (true)
     {
-        if (!temperatureRecoverySent && readMilliseconds() >= 3000u)
+        unsigned int now = readMilliseconds();
+
+        if (firstTransmission || now - lastSendTime >= 500u)
         {
-            if (sendCanFrame(createTemperatureFrame(115)))
+            firstTransmission = false;
+            lastSendTime = now;
+
+            bool rpmRequested = sendCanFrame(createRpmFrame(1500));
+
+            bool temperatureRequested = sendCanFrame(createTemperatureFrame(90));
+
+            bool speedRequested = sendCanFrame(createSpeedFrame(60));
+
+            if (rpmRequested && temperatureRequested && speedRequested)
             {
-                writeUart("Temperature recovery requested!\r\n");
-                temperatureRecoverySent = true;
+                writeUart("Periodic transmission requested!\r\n");
+            }
+            else
+            {
+                writeUart("CAN transmission request failed!\r\n");
             }
         }
 

@@ -1,6 +1,7 @@
 #include "rpm_message.hpp"
 #include "speed_message.hpp"
 #include "temperature_message.hpp"
+
 volatile unsigned int counter = 0;
 
 volatile unsigned int& registerAt(unsigned int address)
@@ -10,12 +11,10 @@ volatile unsigned int& registerAt(unsigned int address)
 
 void initUart()
 {
-    // Enable the UART4 peripheral clock.
-    registerAt(0x40023840) |= (1u << 19);
+    registerAt(0x40023840) = registerAt(0x40023840) | (1u << 19);
 
-    // Configure UART4 for transmission.
-    registerAt(0x40004C0C) = 0;
-    registerAt(0x40004C08) = 139;
+    registerAt(0x40004C0C) = 0u;
+    registerAt(0x40004C08) = 139u;
     registerAt(0x40004C0C) = (1u << 13) | (1u << 3);
 }
 
@@ -23,7 +22,6 @@ void writeUart(const char* text)
 {
     while (*text != '\0')
     {
-        // Wait until the transmit data register is empty.
         while ((registerAt(0x40004C00) & (1u << 7)) == 0)
         {
         }
@@ -33,6 +31,23 @@ void writeUart(const char* text)
         ++text;
     }
 }
+
+void writeNumber(unsigned short value)
+{
+    char text[6];
+    unsigned int position = 5;
+    text[position] = '\0';
+
+    do
+    {
+        text[--position] = static_cast<char>('0' + value % 10);
+
+        value = static_cast<unsigned short>(value / 10);
+    } while (value != 0);
+
+    writeUart(&text[position]);
+}
+
 bool waitCanInit(bool expected)
 {
     for (unsigned int attempt = 0; attempt < 100000; ++attempt)
@@ -47,33 +62,27 @@ bool waitCanInit(bool expected)
 
     return false;
 }
+
 void configureCanFilter()
 {
-    // Enter filter configuration mode.
     registerAt(0x40006600) = (14u << 8) | 1u;
-
-    // Disable filters while configuring them.
     registerAt(0x4000661C) = 0u;
 
-    // Filter 0: mask mode, 32-bit scale, receive FIFO 0.
     registerAt(0x40006604) = 0u;
     registerAt(0x4000660C) = 1u;
     registerAt(0x40006614) = 0u;
 
-    // Zero mask accepts every identifier.
     registerAt(0x40006640) = 0u;
     registerAt(0x40006644) = 0u;
 
-    // Enable filter 0 and leave configuration mode.
     registerAt(0x4000661C) = 1u;
     registerAt(0x40006600) = 14u << 8;
 }
+
 bool initCan()
 {
-    // Enable the CAN1 peripheral clock.
     registerAt(0x40023840) = registerAt(0x40023840) | (1u << 25);
 
-    // Clear sleep mode and request initialization.
     registerAt(0x40006400) = 1u;
 
     if (!waitCanInit(true))
@@ -81,15 +90,15 @@ bool initCan()
         return false;
     }
 
-    // Bit timing: prescaler 2, segment 1 = 13, segment 2 = 2.
     registerAt(0x4000641C) = 1u | (12u << 16) | (1u << 20);
 
-    // Leave initialization mode.
     configureCanFilter();
+
     registerAt(0x40006400) = 0u;
 
     return waitCanInit(false);
 }
+
 bool sendCanFrame(const CanFrame& frame)
 {
     if (frame.id > 0x7FFu || frame.length > 8)
@@ -136,6 +145,7 @@ bool sendRpm(unsigned short rpm)
 {
     return sendCanFrame(createRpmFrame(rpm));
 }
+
 bool receiveCanFrame(CanFrame& frame)
 {
     if ((registerAt(0x4000640C) & 3u) == 0)
@@ -186,24 +196,34 @@ bool receiveRpm(unsigned short& rpm)
     rpm = readRpm(frame);
     return true;
 }
-void writeNumber(unsigned short value)
+
+void initTimer()
 {
-    char text[6];
-    unsigned int position = 5;
-    text[position] = '\0';
+    registerAt(0x40023840) = registerAt(0x40023840) | 1u;
 
-    do
-    {
-        text[--position] = static_cast<char>('0' + value % 10);
+    registerAt(0x40000000) = 0u;
 
-        value = static_cast<unsigned short>(value / 10);
-    } while (value != 0);
+    // TIM2 in this Renode platform uses a 10 MHz clock.
+    // Divide by 10000 to obtain one tick per millisecond.
+    registerAt(0x40000028) = 9999u;
+    registerAt(0x4000002C) = 0xFFFFFFFFu;
 
-    writeUart(&text[position]);
+    registerAt(0x40000014) = 1u;
+    registerAt(0x40000010) = 0u;
+    registerAt(0x40000024) = 0u;
+
+    registerAt(0x40000000) = 1u;
 }
+
+unsigned int readMilliseconds()
+{
+    return registerAt(0x40000024);
+}
+
 int main()
 {
     initUart();
+    initTimer();
 
     if (!initCan())
     {
@@ -217,33 +237,54 @@ int main()
 #ifdef CAN_RECEIVER
     writeUart("CAN receiver ready!\r\n");
 
+    bool hasRpm = false;
+    bool rpmStaleReported = false;
+    unsigned short lastRpm = 0;
+    unsigned int lastRpmTime = 0;
+
+    bool hasTemperature = false;
+    bool temperatureStaleReported = false;
+    std::int16_t lastTemperature = 0;
+    unsigned int lastTemperatureTime = 0;
+
+    bool hasSpeed = false;
+    bool speedStaleReported = false;
+    unsigned short lastSpeed = 0;
+    unsigned int lastSpeedTime = 0;
+
     while (true)
     {
         CanFrame frame{};
 
         if (receiveCanFrame(frame))
         {
+            unsigned int receivedAt = readMilliseconds();
+
             if (isRpmFrame(frame))
             {
+                lastRpm = readRpm(frame);
+                lastRpmTime = receivedAt;
+                hasRpm = true;
+                rpmStaleReported = false;
+
                 writeUart("Received RPM: ");
-                writeNumber(readRpm(frame));
+                writeNumber(lastRpm);
                 writeUart("\r\n");
             }
             else if (isTemperatureFrame(frame))
             {
-                std::int16_t temperature = readTemperature(frame);
+                lastTemperature = readTemperature(frame);
+                lastTemperatureTime = receivedAt;
+                hasTemperature = true;
+                temperatureStaleReported = false;
 
                 writeUart("Received temperature: ");
 
-                if (temperature < 0)
-                {
-                    writeUart("-");
-                }
-
-                int magnitude = temperature;
+                int magnitude = lastTemperature;
 
                 if (magnitude < 0)
                 {
+                    writeUart("-");
                     magnitude = -magnitude;
                 }
 
@@ -252,12 +293,38 @@ int main()
             }
             else if (isSpeedFrame(frame))
             {
+                lastSpeed = readSpeed(frame);
+                lastSpeedTime = receivedAt;
+                hasSpeed = true;
+                speedStaleReported = false;
+
                 writeUart("Received speed: ");
-                writeNumber(readSpeed(frame));
+                writeNumber(lastSpeed);
                 writeUart(" km/h\r\n");
             }
         }
+
+        unsigned int now = readMilliseconds();
+
+        if (hasRpm && !rpmStaleReported && now - lastRpmTime >= 2000u)
+        {
+            writeUart("Dashboard: RPM data stale\r\n");
+            rpmStaleReported = true;
+        }
+
+        if (hasTemperature && !temperatureStaleReported && now - lastTemperatureTime >= 2000u)
+        {
+            writeUart("Dashboard: temperature data stale\r\n");
+            temperatureStaleReported = true;
+        }
+
+        if (hasSpeed && !speedStaleReported && now - lastSpeedTime >= 2000u)
+        {
+            writeUart("Dashboard: speed data stale\r\n");
+            speedStaleReported = true;
+        }
     }
+
 #else
     writeUart("CAN sender ready!\r\n");
 
@@ -269,6 +336,7 @@ int main()
     {
         writeUart("CAN transmit mailbox unavailable!\r\n");
     }
+
     if (sendCanFrame(createTemperatureFrame(-10)))
     {
         writeUart("Temperature transmission requested!\r\n");
@@ -277,6 +345,7 @@ int main()
     {
         writeUart("Temperature transmission request failed!\r\n");
     }
+
     if (sendCanFrame(createSpeedFrame(60)))
     {
         writeUart("Speed transmission requested!\r\n");
@@ -285,6 +354,7 @@ int main()
     {
         writeUart("Speed transmission request failed!\r\n");
     }
+
     while (true)
     {
         counter = counter + 1;

@@ -1,7 +1,7 @@
+#include "monitoring_config.hpp"
 #include "rpm_message.hpp"
 #include "speed_message.hpp"
 #include "temperature_message.hpp"
-
 volatile unsigned int counter = 0;
 
 volatile unsigned int& registerAt(unsigned int address)
@@ -290,6 +290,11 @@ int main()
 
                 writeNumber(static_cast<unsigned short>(magnitude));
                 writeUart(" C\r\n");
+
+                if (lastTemperature >= ENGINE_OVERHEAT_THRESHOLD_C)
+                {
+                    writeUart("WARNING: engine temperature too high\r\n");
+                }
             }
             else if (isSpeedFrame(frame))
             {
@@ -361,7 +366,7 @@ int main()
     {
         if (!temperatureRecoverySent && readMilliseconds() >= 3000u)
         {
-            if (sendCanFrame(createTemperatureFrame(90)))
+            if (sendCanFrame(createTemperatureFrame(115)))
             {
                 writeUart("Temperature recovery requested!\r\n");
                 temperatureRecoverySent = true;

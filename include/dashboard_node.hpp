@@ -2,7 +2,8 @@
 #include <chrono>
 
 #include "can_frame.hpp"
-inline constexpr std::int16_t ENGINE_OVERHEAT_THRESHOLD_C = 110;
+#include "monitoring_config.hpp"
+
 class DashboardNode
 {
    public:

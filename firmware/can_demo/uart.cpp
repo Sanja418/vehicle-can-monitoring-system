@@ -1,25 +1,26 @@
 #include "uart.hpp"
 
 #include "register_access.hpp"
+#include "stm32_registers.hpp"
 
 void initUart()
 {
-    registerAt(0x40023840) = registerAt(0x40023840) | (1u << 19);
+    registerAt(stm32::RCC_APB1ENR) = registerAt(stm32::RCC_APB1ENR) | (1u << 19);
 
-    registerAt(0x40004C0C) = 0u;
-    registerAt(0x40004C08) = 139u;
-    registerAt(0x40004C0C) = (1u << 13) | (1u << 3);
+    registerAt(stm32::UART4_CR1) = 0u;
+    registerAt(stm32::UART4_BRR) = 139u;
+    registerAt(stm32::UART4_CR1) = (1u << 13) | (1u << 3);
 }
 
 void writeUart(const char* text)
 {
     while (*text != '\0')
     {
-        while ((registerAt(0x40004C00) & (1u << 7)) == 0)
+        while ((registerAt(stm32::UART4_SR) & (1u << 7)) == 0)
         {
         }
 
-        registerAt(0x40004C04) = static_cast<unsigned char>(*text);
+        registerAt(stm32::UART4_DR) = static_cast<unsigned char>(*text);
 
         ++text;
     }

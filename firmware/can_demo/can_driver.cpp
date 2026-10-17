@@ -2,12 +2,13 @@
 
 #include "register_access.hpp"
 #include "rpm_message.hpp"
+#include "stm32_registers.hpp"
 
 bool waitCanInit(bool expected)
 {
     for (unsigned int attempt = 0; attempt < 100000; ++attempt)
     {
-        bool acknowledged = (registerAt(0x40006404) & 1u) != 0;
+        bool acknowledged = (registerAt(stm32::CAN1_MSR) & 1u) != 0;
 
         if (acknowledged == expected)
         {
@@ -20,36 +21,36 @@ bool waitCanInit(bool expected)
 
 void configureCanFilter()
 {
-    registerAt(0x40006600) = (14u << 8) | 1u;
-    registerAt(0x4000661C) = 0u;
+    registerAt(stm32::CAN1_FMR) = (14u << 8) | 1u;
+    registerAt(stm32::CAN1_FA1R) = 0u;
 
-    registerAt(0x40006604) = 0u;
-    registerAt(0x4000660C) = 1u;
-    registerAt(0x40006614) = 0u;
+    registerAt(stm32::CAN1_FM1R) = 0u;
+    registerAt(stm32::CAN1_FS1R) = 1u;
+    registerAt(stm32::CAN1_FFA1R) = 0u;
 
-    registerAt(0x40006640) = 0u;
-    registerAt(0x40006644) = 0u;
+    registerAt(stm32::CAN1_F0R1) = 0u;
+    registerAt(stm32::CAN1_F0R2) = 0u;
 
-    registerAt(0x4000661C) = 1u;
-    registerAt(0x40006600) = 14u << 8;
+    registerAt(stm32::CAN1_FA1R) = 1u;
+    registerAt(stm32::CAN1_FMR) = 14u << 8;
 }
 
 bool initCan()
 {
-    registerAt(0x40023840) = registerAt(0x40023840) | (1u << 25);
+    registerAt(stm32::RCC_APB1ENR) = registerAt(stm32::RCC_APB1ENR) | (1u << 25);
 
-    registerAt(0x40006400) = 1u;
+    registerAt(stm32::CAN1_MCR) = 1u;
 
     if (!waitCanInit(true))
     {
         return false;
     }
 
-    registerAt(0x4000641C) = 1u | (12u << 16) | (1u << 20);
+    registerAt(stm32::CAN1_BTR) = 1u | (12u << 16) | (1u << 20);
 
     configureCanFilter();
 
-    registerAt(0x40006400) = 0u;
+    registerAt(stm32::CAN1_MCR) = 0u;
 
     return waitCanInit(false);
 }
@@ -78,16 +79,16 @@ bool sendCanFrame(const CanFrame& frame)
 
     for (unsigned int attempt = 0; attempt < 100000; ++attempt)
     {
-        if ((registerAt(0x40006408) & (1u << 26)) != 0)
+        if ((registerAt(stm32::CAN1_TSR) & (1u << 26)) != 0)
         {
             unsigned int identifier = frame.id << 21;
 
-            registerAt(0x40006580) = identifier;
-            registerAt(0x40006584) = frame.length;
-            registerAt(0x40006588) = lowData;
-            registerAt(0x4000658C) = highData;
+            registerAt(stm32::CAN1_TI0R) = identifier;
+            registerAt(stm32::CAN1_TDT0R) = frame.length;
+            registerAt(stm32::CAN1_TDL0R) = lowData;
+            registerAt(stm32::CAN1_TDH0R) = highData;
 
-            registerAt(0x40006580) = identifier | 1u;
+            registerAt(stm32::CAN1_TI0R) = identifier | 1u;
 
             return true;
         }
@@ -103,17 +104,17 @@ bool sendRpm(unsigned short rpm)
 
 bool receiveCanFrame(CanFrame& frame)
 {
-    if ((registerAt(0x4000640C) & 3u) == 0)
+    if ((registerAt(stm32::CAN1_RF0R) & 3u) == 0)
     {
         return false;
     }
 
-    unsigned int identifier = registerAt(0x400065B0);
-    unsigned int length = registerAt(0x400065B4) & 0xFu;
-    unsigned int lowData = registerAt(0x400065B8);
-    unsigned int highData = registerAt(0x400065BC);
+    unsigned int identifier = registerAt(stm32::CAN1_RI0R);
+    unsigned int length = registerAt(stm32::CAN1_RDT0R) & 0xFu;
+    unsigned int lowData = registerAt(stm32::CAN1_RDL0R);
+    unsigned int highData = registerAt(stm32::CAN1_RDH0R);
 
-    registerAt(0x4000640C) = 1u << 5;
+    registerAt(stm32::CAN1_RF0R) = 1u << 5;
 
     if ((identifier & 6u) != 0 || length > 8)
     {

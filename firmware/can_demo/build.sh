@@ -23,6 +23,9 @@ build_firmware()
         -T firmware/can_demo/linker.ld \
         firmware/can_demo/startup.s \
         firmware/can_demo/main.cpp \
+                firmware/can_demo/uart.cpp \
+                        firmware/can_demo/timer.cpp \
+                                firmware/can_demo/can_driver.cpp \
                 -I include \
         src/rpm_message.cpp \
                 src/temperature_message.cpp \

@@ -1,0 +1,15 @@
+include $ORIGIN/two_nodes.resc
+
+# Normal communication.
+emulation RunFor "3.2s"
+
+# Stop only the sender CPU.
+mach set "Sender"
+cpu IsHalted true
+
+# Receiver keeps running and detects stale data.
+emulation RunFor "3s"
+
+# Resume the sender without resetting either node.
+cpu IsHalted false
+emulation RunFor "0.6s"

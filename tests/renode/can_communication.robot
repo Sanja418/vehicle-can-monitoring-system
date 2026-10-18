@@ -32,3 +32,25 @@ Should Detect Interruption And Recover
     Wait For Line On Uart    Received RPM: 1500
     Wait For Line On Uart    Received temperature: 90 C
     Wait For Line On Uart    Received speed: 60 km/h
+
+Should Warn Only At High Temperature
+    Execute Command    include @${CURDIR}/../../firmware/can_demo/two_nodes.resc
+    Create Terminal Tester    sysbus.uart4    machine=Receiver    timeout=2    defaultPauseEmulation=true
+
+    Wait For Line On Uart    Received temperature: 90 C
+
+    Execute Command    mach set "Sender"
+    Execute Command    sysbus WriteWord `sysbus GetSymbolAddress "simulatedTemperature"` 109
+
+    Wait For Line On Uart    Received temperature: 109 C
+    Should Not Be On Uart    WARNING: engine temperature too high    timeout=0.6
+
+    Execute Command    sysbus WriteWord `sysbus GetSymbolAddress "simulatedTemperature"` 110
+
+    Wait For Line On Uart    Received temperature: 110 C
+    Wait For Line On Uart    WARNING: engine temperature too high
+
+    Execute Command    sysbus WriteWord `sysbus GetSymbolAddress "simulatedTemperature"` 90
+
+    Wait For Line On Uart    Received temperature: 90 C
+    Should Not Be On Uart    WARNING: engine temperature too high    timeout=0.6

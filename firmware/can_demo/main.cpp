@@ -7,6 +7,9 @@
 #include "timer.hpp"
 #include "uart.hpp"
 volatile unsigned int counter = 0;
+#ifndef CAN_RECEIVER
+volatile std::int16_t simulatedTemperature = 90;
+#endif
 
 int main()
 {
@@ -135,7 +138,7 @@ int main()
 
             bool rpmRequested = sendCanFrame(createRpmFrame(1500));
 
-            bool temperatureRequested = sendCanFrame(createTemperatureFrame(90));
+            bool temperatureRequested = sendCanFrame(createTemperatureFrame(simulatedTemperature));
 
             bool speedRequested = sendCanFrame(createSpeedFrame(60));
 

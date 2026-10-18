@@ -18,5 +18,5 @@ bash firmware/can_demo/build.sh
     --css-file "$renode_dir/tests/robot.css" \
     --robot-framework-remote-server-full-directory "$renode_dir" \
     --robot-framework-remote-server-name renode.exe \
-    -r build/renode-results \
+        -r "build/renode-results/$(date +%Y%m%d-%H%M%S)" \
     tests/renode/can_communication.robot

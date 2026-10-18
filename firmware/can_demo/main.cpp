@@ -8,7 +8,9 @@
 #include "uart.hpp"
 volatile unsigned int counter = 0;
 #ifndef CAN_RECEIVER
-volatile std::int16_t simulatedTemperature = 90;
+alignas(4) volatile std::int16_t simulatedTemperature = 90;
+alignas(4) volatile bool rpmTransmissionEnabled = true;
+alignas(4) volatile std::uint8_t simulatedRpmLength = 2;
 #endif
 
 int main()
@@ -136,7 +138,15 @@ int main()
             firstTransmission = false;
             lastSendTime = now;
 
-            bool rpmRequested = sendCanFrame(createRpmFrame(1500));
+            bool rpmRequested = true;
+
+            if (rpmTransmissionEnabled)
+            {
+                CanFrame rpmFrame = createRpmFrame(1500);
+                rpmFrame.length = simulatedRpmLength;
+
+                rpmRequested = sendCanFrame(rpmFrame);
+            }
 
             bool temperatureRequested = sendCanFrame(createTemperatureFrame(simulatedTemperature));
 

@@ -84,14 +84,17 @@ Prilagoditi putanju ako je Renode instaliran u drugom folderu.
 bash tests/renode/run_tests.sh
 ```
 
-Skripta kompajlira firmware i pokreće dva testa:
+Skripta kompajlira firmware i pokreće pet automatskih testova:
 
-- prijem sva tri podatka;
-- zastarevanje nakon prekida i prijem nakon oporavka.
+1. Prijem RPM-a, temperature i brzine.
+2. Detekcija zastarelih podataka nakon prekida slanja i prijem nakon oporavka.
+3. Provera da se upozorenje na pregrevanje pojavljuje pri 110 °C, a izostaje pri 109 °C i nakon povratka na 90 °C.
+4. Nezavisno praćenje svežine RPM-a dok temperatura i brzina nastavljaju da stižu.
+5. Odbacivanje RPM poruke pogrešne dužine i nastavak prijema nakon vraćanja ispravne dužine.
 
 Python okruženje nije potrebno prethodno aktivirati.
 
-U run_tests.sh prilagoditi putanju ARM kompajlera drugom računaru.
+Pre pokretanja testova dodati ARM kompajler u PATH, prema odeljku „ARM kompajler“.
 Putanja Renode instalacije može se zadati ovako:
 
 ```bash
@@ -100,8 +103,17 @@ RENODE_DIR="D:/Tools/Renode" bash tests/renode/run_tests.sh
 
 ## Rezultati
 
-- build/renode-results/report.html — pregled rezultata
-- build/renode-results/log.html — detalji izvršavanja
+Svako pokretanje testova pravi zaseban folder:
+
+build/renode-results/GGGGMMDD-HHMMSS/
+
+Naziv foldera sadrži datum i vreme pokretanja. U njemu se nalaze:
+
+- report.html — pregled rezultata testova;
+- log.html — detalji izvršavanja;
+- robot_output.xml — rezultati u XML formatu.
+
+Tačne putanje ispisuju se u terminalu nakon završetka testiranja.
 
 Build izlazi i Python okruženje ne čuvaju se u Gitu.
 
